@@ -10,15 +10,33 @@
 
 using namespace std;
 
-int main()
+int main(int argc, char* argv[])
 {
-    ifstream file("input.txt");
+    // ── Input source: file argument OR stdin ──────────────────────────────
+    // CLI usage:  ./optimizer input.txt    (reads from file)
+    // Web usage:  ./optimizer              (reads from stdin — piped by server)
+    //             echo "t1 = 5 + 3" | ./optimizer
+    istream* input = &cin;
+    ifstream fileStream;
+
+    if (argc > 1)
+    {
+        fileStream.open(argv[1]);
+
+        if (!fileStream.is_open())
+        {
+            cerr << "Error: could not open \"" << argv[1] << "\" — file missing or unreadable.\n";
+            return 1;
+        }
+
+        input = &fileStream;
+    }
 
     vector<Instruction> code;
 
     string line;
 
-    while (getline(file, line))
+    while (getline(*input, line))
     {
         if (!line.empty())
         {
@@ -35,7 +53,7 @@ int main()
 
     cout << "\n----- BASIC BLOCKS -----\n";
 
-    for (int i = 0; i < blocks.size(); i++)
+    for (int i = 0; i < (int)blocks.size(); i++)
     {
         cout << "Block " << blocks[i].id << ":\n";
 
@@ -50,21 +68,30 @@ int main()
 
     for (auto &p : cfg)
     {
-        cout << "Block " << p.first << " -> ";
+        int src = p.first;
+        const Instruction& lastInstr = blocks[src].instructions.back();
+        bool hasGoto = (lastInstr.op == "goto");
 
-        for (auto x : p.second)
+        for (int j = 0; j < (int)p.second.size(); j++)
         {
-            cout << x << " ";
+            int dst = p.second[j];
+
+            // First successor of a goto block is the jump target;
+            // any additional successor is the fallthrough.
+            string edgeType = (hasGoto && j == 0) ? "[jump]" : "[fall]";
+
+            cout << "Block " << src << " --" << edgeType << "--> Block " << dst << "\n";
         }
 
-        cout << endl;
+        // Sink block (no successors)
+        if (p.second.empty())
+            cout << "Block " << src << " --> (exit)\n";
     }
 
     // STEP 3: Optimization
-    // FIX THIS AFTER SENDING optimizer.h
 
     cout << "\n----- OPTIMIZED BLOCKS -----\n";
-    for (int i = 0; i < blocks.size(); i++)
+    for (int i = 0; i < (int)blocks.size(); i++)
     {
         constantFolding(blocks[i].instructions);
 
@@ -76,14 +103,38 @@ int main()
 
         deadCodeElimination(blocks[i].instructions);
     }
-    
-    for (int i = 0; i < blocks.size(); i++)
+
+    // ── Write optimized output to stdout (captured by server.js) ─────────
+    for (int i = 0; i < (int)blocks.size(); i++)
     {
         cout << "Block " << blocks[i].id << ":\n";
-    
+
         printCode(blocks[i].instructions);
-    
-        cout << endl;
+
+        cout << "\n";
+    }
+
+    // ── Also persist to output.txt ────────────────────────────────────────
+    ofstream outFile("output.txt");
+
+    if (outFile.is_open())
+    {
+        outFile << "----- OPTIMIZED CODE -----\n";
+
+        for (int i = 0; i < (int)blocks.size(); i++)
+        {
+            outFile << "Block " << blocks[i].id << ":\n";
+
+            printCode(blocks[i].instructions, outFile);
+
+            outFile << "\n";
+        }
+
+        outFile.close();
+    }
+    else
+    {
+        cerr << "Warning: could not open output.txt for writing.\n";
     }
 
     return 0;
