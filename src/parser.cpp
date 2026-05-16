@@ -7,7 +7,7 @@
 
 using namespace std;
 
-Instruction parse(string line)
+Instruction parse(const string& line)
 {
     Instruction inst;
 
@@ -33,17 +33,24 @@ Instruction parse(string line)
     return inst;
 }
 
-void printCode(const vector<Instruction>& code)
+// Core: write instructions to any output stream
+void printCode(const vector<Instruction>& code, ostream& out)
 {
-    for (int i = 0; i < code.size(); i++)
+    for (int i = 0; i < (int)code.size(); i++)
     {
-        cout << code[i].result << " = " << code[i].op1;
+        out << code[i].result << " = " << code[i].op1;
 
         if (code[i].op != "")
         {
-            cout << " " << code[i].op << " " << code[i].op2;
+            out << " " << code[i].op << " " << code[i].op2;
         }
 
-        cout << endl;
+        out << "\n";
     }
+}
+
+// Convenience: print to stdout
+void printCode(const vector<Instruction>& code)
+{
+    printCode(code, cout);
 }

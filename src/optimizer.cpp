@@ -14,13 +14,18 @@ void constantFolding(vector<Instruction>& code) {
             int b = stoi(i.op2);
             int res = 0;
 
-            if (i.op == "+") res = a + b;
+            if      (i.op == "+") res = a + b;
             else if (i.op == "-") res = a - b;
             else if (i.op == "*") res = a * b;
-            else if (i.op == "/") res = a / b;
+            else if (i.op == "/") {
+                // Division by zero is undefined behaviour — leave instruction as-is
+                if (b == 0) continue;
+                res = a / b;
+            }
+            else continue; // unknown operator — don't fold
 
             i.op1 = to_string(res);
-            i.op = "";
+            i.op  = "";
             i.op2 = "";
         }
     }
@@ -91,16 +96,22 @@ void algebraicSimplification(vector<Instruction>& code)
     }
 }
 // ---------------- COMMON SUBEXPRESSION ELIMINATION ----------------
+//
+// Key uses '|' delimiters so that expressions with different operand/operator
+// splits can never produce the same key string.
+// e.g.  op1="ab", op="+", op2="c"  →  "ab|+|c"
+//       op1="a",  op="b+", op2="c" →  "a|b+|c"   (different — no false match)
+//
 void CSE(vector<Instruction>& code) {
     map<string, string> expr;
 
     for (auto &i : code) {
         if (i.op != "") {
-            string key = i.op1 + i.op + i.op2;
+            string key = i.op1 + "|" + i.op + "|" + i.op2;
 
             if (expr.count(key)) {
                 i.op1 = expr[key];
-                i.op = "";
+                i.op  = "";
                 i.op2 = "";
             } else {
                 expr[key] = i.result;
@@ -110,21 +121,73 @@ void CSE(vector<Instruction>& code) {
 }
 
 // ---------------- DEAD CODE ELIMINATION ----------------
+//
+// Algorithm: Iterative Backward Liveness Analysis
+//
+//   Liveness rule:
+//     A variable v is LIVE before instruction I if:
+//       - v is used by I, OR
+//       - v is live after I and I does not define v.
+//
+//   Conservative live-out seed:
+//     Non-temporary variables (user-defined names like x, y, a, b) are assumed
+//     live at the exit of every block — we have no inter-block info here.
+//     Temporaries (t1, t2, …) are assumed dead at block exit; they must
+//     be proven live by being used in a subsequent instruction.
+//
+//   The outer while-loop repeats until no instruction is removed (fixed point).
+//   This is required because removing one dead instruction may expose another.
+//
 void deadCodeElimination(vector<Instruction>& code) {
-    set<string> used;
+    bool changed = true;
 
-    for (auto &i : code) {
-        if (i.op1 != "") used.insert(i.op1);
-        if (i.op2 != "") used.insert(i.op2);
-    }
+    while (changed) {
+        changed = false;
 
-    vector<Instruction> newCode;
-
-    for (auto &i : code) {
-        if (used.count(i.result) || i.result == "x" || i.result == "y") {
-            newCode.push_back(i);
+        // ── Seed: non-temporary results are always live-out ──────────────
+        set<string> live;
+        for (const auto& instr : code) {
+            // Labels and jump instructions are control-flow: always keep
+            bool isLabel = (!instr.result.empty() && instr.result.back() == ':');
+            if (!isLabel && !isTemporary(instr.result) && !instr.result.empty())
+                live.insert(instr.result);
         }
-    }
 
-    code = newCode;
+        // ── Backward pass ─────────────────────────────────────────────────
+        vector<bool> keep(code.size(), false);
+
+        for (int i = (int)code.size() - 1; i >= 0; i--) {
+            const auto& instr = code[i];
+
+            bool isLabel = (!instr.result.empty() && instr.result.back() == ':');
+            bool isJump  = (instr.op == "goto");
+
+            // Keep if: label, jump, or result is live
+            if (isLabel || isJump || live.count(instr.result)) {
+                keep[i] = true;
+
+                // This instruction "satisfies" the use of result —
+                // remove it from live (it's now defined here, not needed above)
+                live.erase(instr.result);
+
+                // Its operands are now required — mark them live
+                if (!instr.op1.empty() && !isNumber(instr.op1) && instr.op1 != "_")
+                    live.insert(instr.op1);
+                if (!instr.op2.empty() && !isNumber(instr.op2) && instr.op2 != "_")
+                    live.insert(instr.op2);
+            }
+            // else: result is dead — instruction is silently dropped
+        }
+
+        // ── Rebuild code, flag convergence ───────────────────────────────
+        vector<Instruction> newCode;
+        for (int i = 0; i < (int)code.size(); i++) {
+            if (keep[i])
+                newCode.push_back(code[i]);
+            else
+                changed = true;  // at least one instruction removed → re-run
+        }
+
+        code = newCode;
+    }
 }

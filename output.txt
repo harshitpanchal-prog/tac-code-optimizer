@@ -1,0 +1,7 @@
+----- OPTIMIZED CODE -----
+Block 0:
+t2 = 17 * 8
+t3 = a + b
+x = t2 * 9
+y = t3 + 5
+

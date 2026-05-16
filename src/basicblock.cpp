@@ -10,16 +10,17 @@ vector<BasicBlock> formBasicBlocks(vector<Instruction>& code) {
     leaders.insert(0); // first instruction
 
     // Step 1: find leaders
-    for (int i = 0; i < code.size(); i++) {
+    for (int i = 0; i < (int)code.size(); i++) {
 
         // if label exists → leader
-        if (code[i].result.back() == ':') {
+        // Guard: result must be non-empty before calling .back()
+        if (!code[i].result.empty() && code[i].result.back() == ':') {
             leaders.insert(i);
         }
 
         // if jump → next is leader
         if (code[i].op == "goto") {
-            if (i + 1 < code.size())
+            if (i + 1 < (int)code.size())
                 leaders.insert(i + 1);
         }
     }
@@ -29,12 +30,12 @@ vector<BasicBlock> formBasicBlocks(vector<Instruction>& code) {
     vector<BasicBlock> blocks;
 
     // Step 2: create blocks
-    for (int i = 0; i < leaderList.size(); i++) {
+    for (int i = 0; i < (int)leaderList.size(); i++) {
         BasicBlock block;
         block.id = i;
 
         int start = leaderList[i];
-        int end = (i + 1 < leaderList.size()) ? leaderList[i + 1] : code.size();
+        int end = (i + 1 < (int)leaderList.size()) ? leaderList[i + 1] : (int)code.size();
 
         for (int j = start; j < end; j++) {
             block.instructions.push_back(code[j]);
