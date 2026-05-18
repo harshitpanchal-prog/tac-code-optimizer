@@ -18,4 +18,11 @@ void printCode(const vector<Instruction>& code);
 // Print to any output stream (file, stringstream, cout, etc.)
 void printCode(const vector<Instruction>& code, ostream& out);
 
-#endif
+// ============================ parser.h ADD ============================
+
+void printCode(
+    const vector<Instruction>& code,
+    ostream& out
+);
+
+#endif
