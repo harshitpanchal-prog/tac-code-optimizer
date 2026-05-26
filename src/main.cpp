@@ -124,30 +124,22 @@ int main(int argc, char* argv[])
     }
 
     // ── OPTIMIZATION ────────────────────────────────────
+    constantFolding(code);
+
+    algebraicSimplification(code);
+
+    constantPropagation(code);
+
+    CSE(code);
+
+    deadCodeElimination(code);
+
+    // rebuild blocks after optimization
+    blocks = formBasicBlocks(code);
+    
     cout << "\n----- OPTIMIZED BLOCKS -----\n";
 
-    for (int i = 0; i < (int)blocks.size(); i++)
-    {
-        constantFolding(
-            blocks[i].instructions
-        );
-
-        algebraicSimplification(
-            blocks[i].instructions
-        );
-
-        constantPropagation(
-            blocks[i].instructions
-        );
-
-        CSE(
-            blocks[i].instructions
-        );
-
-        deadCodeElimination(
-            blocks[i].instructions
-        );
-    }
+    
 
     // ── PRINT OPTIMIZED BLOCKS ──────────────────────────
     for (int i = 0; i < (int)blocks.size(); i++)

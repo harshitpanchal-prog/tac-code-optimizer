@@ -1,32 +1,30 @@
 ----- OPTIMIZED CODE -----
 Block 0:
-t1 = 8
-t2 = 20
-t3 = 8 + 20
-t4 = a + b
-t5 = t4
-t6 = t4
-t7 = t6
-t8 = 0
-if cond goto 12
+a = 10
+b = 20
+i = 0
+sum = 0
 
 Block 1:
-t9 = 300
-t10 = 300
-goto 15
+L1:
+t7 = i < 5
+if t7 goto L2
 
 Block 2:
-L1:
-t11 = 20
-t12 = 20
-t13 = 0
+goto L3
 
 Block 3:
 L2:
-x = t3 + t12
-y = x
-z = y
-unused1 = p + q
-unused2 = unused1
-unused3 = unused2
+temp1 = 0 + 0
+sum = temp1
+i = 0 + 1
+goto L1
+
+Block 4:
+L3:
+result = sum
+dead1 = x + y
+dead2 = dead1
+dead3 = 300
+dead4 = 300
 

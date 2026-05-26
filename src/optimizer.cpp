@@ -9,20 +9,40 @@
 
 using namespace std;
 
+// ======================================================
+// Check relational operators
+// ======================================================
+bool isRelOp(const string& op)
+{
+    return (
+        op == "<"  ||
+        op == ">"  ||
+        op == "<=" ||
+        op == ">=" ||
+        op == "==" ||
+        op == "!="
+    );
+}
+
+// ======================================================
 // CONSTANT FOLDING
+// ======================================================
 void constantFolding(vector<Instruction>& code)
 {
     for (auto &i : code)
     {
-        if (i.op != "" &&
+        if (
+            i.op != "" &&
             isNumber(i.op1) &&
-            isNumber(i.op2))
+            isNumber(i.op2)
+        )
         {
             int a = stoi(i.op1);
             int b = stoi(i.op2);
 
             int res = 0;
 
+            // arithmetic
             if (i.op == "+")
                 res = a + b;
 
@@ -40,6 +60,30 @@ void constantFolding(vector<Instruction>& code)
                 res = a / b;
             }
 
+            // relational
+            else if (i.op == "<")
+                res = (a < b);
+
+            else if (i.op == ">")
+                res = (a > b);
+
+            else if (i.op == "<=")
+                res = (a <= b);
+
+            else if (i.op == ">=")
+                res = (a >= b);
+
+            else if (i.op == "==")
+                res = (a == b);
+
+            else if (i.op == "!=")
+                res = (a != b);
+
+            else
+            {
+                continue;
+            }
+
             i.op1 = to_string(res);
 
             i.op = "";
@@ -48,21 +92,46 @@ void constantFolding(vector<Instruction>& code)
     }
 }
 
+// ======================================================
 // CONSTANT PROPAGATION
+// ======================================================
 void constantPropagation(vector<Instruction>& code)
 {
     unordered_map<string, string> table;
 
     for (auto &i : code)
     {
-        if (table.count(i.op1))
+        // NEVER propagate into jumps
+        if (
+            i.op == "goto" ||
+            i.op == "ifgoto"
+        )
+        {
+            continue;
+        }
+
+        // replace operands safely
+        if (
+            table.count(i.op1) &&
+            !isRelOp(i.op)
+        )
+        {
             i.op1 = table[i.op1];
+        }
 
-        if (table.count(i.op2))
+        if (
+            table.count(i.op2) &&
+            !isRelOp(i.op)
+        )
+        {
             i.op2 = table[i.op2];
+        }
 
-        if (i.op == "" &&
-            isNumber(i.op1))
+        // store constants
+        if (
+            i.op == "" &&
+            isNumber(i.op1)
+        )
         {
             table[i.result] = i.op1;
         }
@@ -73,12 +142,15 @@ void constantPropagation(vector<Instruction>& code)
     }
 }
 
+// ======================================================
 // ALGEBRAIC SIMPLIFICATION
+// ======================================================
 void algebraicSimplification(
     vector<Instruction>& code)
 {
     for (auto &i : code)
     {
+        // x + 0 = x
         if (i.op == "+" &&
             i.op2 == "0")
         {
@@ -86,6 +158,7 @@ void algebraicSimplification(
             i.op2 = "";
         }
 
+        // 0 + x = x
         else if (i.op == "+" &&
                  i.op1 == "0")
         {
@@ -94,6 +167,7 @@ void algebraicSimplification(
             i.op2 = "";
         }
 
+        // x * 1 = x
         else if (i.op == "*" &&
                  i.op2 == "1")
         {
@@ -101,6 +175,7 @@ void algebraicSimplification(
             i.op2 = "";
         }
 
+        // 1 * x = x
         else if (i.op == "*" &&
                  i.op1 == "1")
         {
@@ -109,9 +184,12 @@ void algebraicSimplification(
             i.op2 = "";
         }
 
-        else if (i.op == "*" &&
-                (i.op1 == "0" ||
-                 i.op2 == "0"))
+        // x * 0 = 0
+        else if (
+            i.op == "*" &&
+            (i.op1 == "0" ||
+             i.op2 == "0")
+        )
         {
             i.op1 = "0";
             i.op = "";
@@ -120,14 +198,20 @@ void algebraicSimplification(
     }
 }
 
-// CSE
+// ======================================================
+// COMMON SUBEXPRESSION ELIMINATION
+// ======================================================
 void CSE(vector<Instruction>& code)
 {
     map<string, string> expr;
 
     for (auto &i : code)
     {
-        if (i.op != "")
+        if (
+            i.op != "" &&
+            i.op != "goto" &&
+            i.op != "ifgoto"
+        )
         {
             string key =
                 i.op1 + "|" +
@@ -148,48 +232,85 @@ void CSE(vector<Instruction>& code)
     }
 }
 
+// ======================================================
 // DEAD CODE ELIMINATION
+// ======================================================
 void deadCodeElimination(vector<Instruction>& code)
 {
     set<string> live;
 
-    vector<bool> keep(code.size(), true);
+    // final output variable
+    live.insert("result");
 
-    // Traverse backward
+    vector<bool> keep(code.size(), false);
+
+    // backward traversal
     for (int i = (int)code.size() - 1; i >= 0; i--)
     {
         Instruction& instr = code[i];
 
         bool isLabel =
-            (!instr.result.empty() &&
-             instr.result.back() == ':');
+        (
+            !instr.result.empty() &&
+            instr.result.back() == ':'
+        );
 
         bool isJump =
-            (instr.op == "goto" ||
-             instr.op == "ifgoto");
+        (
+            instr.op == "goto" ||
+            instr.op == "ifgoto"
+        );
 
-        // Always keep labels and jumps
+        // always keep labels/jumps
         if (isLabel || isJump)
         {
             keep[i] = true;
+
+            if (
+                !instr.op1.empty() &&
+                !isNumber(instr.op1)
+            )
+            {
+                live.insert(instr.op1);
+            }
+
+            if (
+                !instr.op2.empty() &&
+                !isNumber(instr.op2)
+            )
+            {
+                live.insert(instr.op2);
+            }
+
             continue;
         }
 
-        // Mark operands live
-        if (!instr.op1.empty() &&
-            !isNumber(instr.op1))
+        // keep if live
+        if (
+            live.count(instr.result) ||
+            !isTemporary(instr.result)
+        )
         {
-            live.insert(instr.op1);
-        }
+            keep[i] = true;
 
-        if (!instr.op2.empty() &&
-            !isNumber(instr.op2))
-        {
-            live.insert(instr.op2);
-        }
+            live.erase(instr.result);
 
-        // Keep ALL assignments for now
-        keep[i] = true;
+            if (
+                !instr.op1.empty() &&
+                !isNumber(instr.op1)
+            )
+            {
+                live.insert(instr.op1);
+            }
+
+            if (
+                !instr.op2.empty() &&
+                !isNumber(instr.op2)
+            )
+            {
+                live.insert(instr.op2);
+            }
+        }
     }
 
     vector<Instruction> newCode;

@@ -22,9 +22,11 @@ Instruction parse(const string& line)
         tempLine.erase(0, 1);
     }
 
+    // ─────────────────────────────────────────
     // LABEL
     // Example:
     // L1:
+    // ─────────────────────────────────────────
     if (!tempLine.empty() && tempLine.back() == ':')
     {
         inst.result = tempLine;
@@ -47,7 +49,6 @@ Instruction parse(const string& line)
     if (first == "goto")
     {
         inst.result = "";
-
         inst.op = "goto";
 
         ss >> inst.op1;
@@ -79,7 +80,10 @@ Instruction parse(const string& line)
 
     // ─────────────────────────────────────────
     // NORMAL TAC
+    // Examples:
     // t1 = a + b
+    // t2 = i < 3
+    // x = y
     // ─────────────────────────────────────────
 
     inst.result = first;
@@ -87,14 +91,28 @@ Instruction parse(const string& line)
     string eq;
     ss >> eq;
 
+    // read first operand
     ss >> inst.op1;
 
+    // try reading operator
     if (ss >> inst.op)
     {
-        ss >> inst.op2;
+        // try reading second operand
+        if (ss >> inst.op2)
+        {
+            // valid binary expression
+        }
+        else
+        {
+            // assignment only
+            inst.op1 = inst.op;
+            inst.op = "";
+            inst.op2 = "";
+        }
     }
     else
     {
+        // simple assignment
         inst.op = "";
         inst.op2 = "";
     }
